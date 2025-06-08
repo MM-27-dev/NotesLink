@@ -10,7 +10,7 @@ import LoginForm from "./components/LoginForm";
 import AuthProvider from "../src/HOC/AuthProvider";
 import ProtectedRoute from "../src/HOC/ProtectedRoute";
 import PublicRoute from "../src/HOC/PublicRoute";
-import appStore from "./utils/appstore";
+import appStore from "./utils/appStore";
 
 
 function App() {
