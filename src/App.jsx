@@ -12,6 +12,7 @@ import ProtectedRoute from "../src/HOC/ProtectedRoute";
 import PublicRoute from "../src/HOC/PublicRoute";
 import appStore from "./utils/appstore";
 
+
 function App() {
   const appRouter = createBrowserRouter([
     {
