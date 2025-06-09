@@ -71,10 +71,10 @@ const ChatUI = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 to-purple-950 flex flex-col">
+    <div className="h-screen bg-gradient-to-br from-purple-900 to-purple-950 flex flex-col">
       <Header />
       <div className="flex-1 flex items-center justify-center p-4">
-        <div className="w-full max-w-2xl h-[500px] bg-[#0f0f1b] rounded-2xl shadow-lg flex flex-col">
+        <div className="w-full max-w-3xl h-[450px] bg-[#0f0f1b] rounded-2xl shadow-lg flex flex-col">
           <div className="p-4 border-b border-purple-800">
             <h2 className="text-pink-400 font-semibold text-lg">
               AI Voice Assistant
