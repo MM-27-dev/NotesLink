@@ -1,57 +1,73 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Mic, Send } from "lucide-react";
+import { Mic, Send, Paperclip, X } from "lucide-react";
 import Header from "./Header";
 import chatData from "../data/chatData";
-import { getGeminiResponse } from "../utils/geminiService";
-import { cleanText } from "../utils/cleanText";
+import useChatSender from "../hooks/useChatSender";
+
+import { FaFile } from "react-icons/fa6"; // Import FaFile
 
 const ChatUI = () => {
   const [messages, setMessages] = useState(chatData);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const messagesEndRef = useRef(null); // Ref for the end of the messages div
+  const [attachedFile, setAttachedFile] = useState(null); // Stores the File object
+  const [filePreview, setFilePreview] = useState(null); // Stores URL for image preview
+  const messagesEndRef = useRef(null);
 
-  // Effect to scroll to the bottom when messages change
+  const { handleSend: sendChatMessage, loading } = useChatSender(
+    messages,
+    setMessages,
+    setInput,
+    setAttachedFile,
+    setFilePreview
+  );
+
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const handleSend = async () => {
-    if (input.trim() === "") return;
-
-    const userMessage = {
-      sender: "user",
-      text: input,
-      time: new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
-    setInput("");
-    setLoading(true);
-
-    // Get response from Gemini
-    const response = await getGeminiResponse(input);
-    const plainText = cleanText(response); // Use the updated cleanText
-
-    const assistantMessage = {
-      sender: "assistant",
-      // Set the text as dangerouslySetInnerHTML to render HTML
-      text: <div dangerouslySetInnerHTML={{ __html: plainText }} />,
-      time: new Date().toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-    };
-
-    setMessages((prev) => [...prev, assistantMessage]);
-    setLoading(false);
+  const handleSendButtonClick = () => {
+    sendChatMessage(input, attachedFile);
   };
 
   const handleKeyPress = (e) => {
-    if (e.key === "Enter") handleSend();
+    if (e.key === "Enter" && !loading) {
+      sendChatMessage(input, attachedFile);
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setAttachedFile(file);
+      if (file.type.startsWith("image/")) {
+        setFilePreview(URL.createObjectURL(file));
+      } else {
+        setFilePreview(null);
+      }
+    }
+  };
+
+  const removeAttachedFile = () => {
+    setAttachedFile(null);
+    setFilePreview(null);
+  };
+
+  // Helper to determine the icon based on file type using react-icons
+  const getFileDisplay = (fileType) => {
+    if (fileType && fileType.startsWith("image/")) {
+      return null; // For images, we'll use the img tag directly for preview
+    }
+
+    let iconColor = "text-pink-500"; // Default pink for general documents
+    if (fileType === "application/pdf") {
+      iconColor = "text-red-500"; // Red specifically for PDFs
+    }
+
+    return (
+      <div className="w-8 h-8 flex items-center justify-center">
+        <FaFile className={`w-5 h-5 ${iconColor}`} />
+      </div>
+    );
   };
 
   return (
@@ -66,97 +82,174 @@ const ChatUI = () => {
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm text-white custom-scrollbar">
-            {" "}
-            {/* Added custom-scrollbar class */}
             {messages.map((msg, index) =>
               msg.sender === "user" ? (
                 <div key={index} className="flex justify-end">
                   <div className="bg-gradient-to-br from-pink-500 to-purple-500 text-white rounded-xl px-4 py-2 shadow-md">
                     <p>{msg.text}</p>
+                    {/* Render the attached file preview based on the new design */}
+                    {msg.file && (
+                      <div className="mt-2 p-2 bg-purple-700/50 rounded-md flex items-center space-x-2">
+                        {msg.fileType &&
+                        msg.filePreview &&
+                        msg.fileType.startsWith("image/") ? (
+                          <img
+                            src={msg.filePreview}
+                            alt="Attached Preview"
+                            className="max-w-[50px] max-h-[50px] rounded"
+                          />
+                        ) : (
+                          getFileDisplay(msg.fileType)
+                        )}
+                        <div className="flex flex-col">
+                          <p className="text-sm font-medium">{msg.file}</p>
+                          {msg.fileType === "application/pdf" && (
+                            <span className="text-xs text-gray-300">PDF</span>
+                          )}
+                          {msg.fileType.startsWith("image/") && (
+                            <span className="text-xs text-gray-300">Image</span>
+                          )}
+                          {msg.fileType.startsWith("text/") && (
+                            <span className="text-xs text-gray-300">
+                              Text Document
+                            </span>
+                          )}
+                          {!(
+                            msg.fileType.startsWith("image/") ||
+                            msg.fileType.startsWith("text/") ||
+                            msg.fileType === "application/pdf"
+                          ) && (
+                            <span className="text-xs text-gray-300">File</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     <span className="text-xs text-gray-300 block text-right mt-1">
                       {msg.time}
                     </span>
                   </div>
                 </div>
               ) : (
-                <div
-                  key={index}
-                  className="max-w-[75%] bg-[#1e1e2e] rounded-lg p-3"
-                >
-                  {/* Render the HTML content using dangerouslySetInnerHTML */}
-                  {msg.text}
-                  <span className="text-xs text-gray-400 block text-right mt-1">
-                    {msg.time}
-                  </span>
+                <div key={index} className="flex justify-start">
+                  <div className="max-w-[75%] bg-[#1e1e2e] rounded-lg p-3 shadow-md">
+                    <p dangerouslySetInnerHTML={{ __html: msg.text }}></p>
+                    <span className="text-xs text-gray-400 block mt-1">
+                      {msg.time}
+                    </span>
+                  </div>
                 </div>
               )
             )}
             {loading && (
-              <div className="max-w-[75%] bg-[#1e1e2e] rounded-lg p-3 flex items-center">
-                <span className="dot-animation mr-2">.</span>
-                <span className="dot-animation mr-2 animation-delay-1">.</span>
-                <span className="dot-animation animation-delay-2">.</span>
+              <div className="flex justify-start">
+                {" "}
+                {/* Wrap in flex to align left */}
+                <div className="max-w-[75%] bg-[#1e1e2e] rounded-lg p-3 ai-waiting-dots">
+                  <div className="ai-waiting-dot"></div>
+                  <div className="ai-waiting-dot"></div>
+                  <div className="ai-waiting-dot"></div>
+                </div>
               </div>
             )}
-            <div ref={messagesEndRef} /> {/* Element to scroll into view */}
+            <div ref={messagesEndRef} />
           </div>
 
-          <div className="p-4 border-t border-purple-800 flex items-center space-x-2">
-            <input
-              type="text"
-              placeholder="Type your message..."
-              className="flex-1 rounded-full px-4 py-2 bg-gray-800 text-white placeholder-gray-400 outline-none"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyPress}
-            />
-            <button className="text-pink-400">
-              <Mic />
-            </button>
-            <button onClick={handleSend} className="text-pink-400">
-              <Send />
-            </button>
+          {/* Input Section */}
+          <div className="p-4 border-t border-purple-800 flex flex-col space-y-2">
+            {/* Attached File Preview (at the bottom, before input) */}
+            {attachedFile && (
+              <div className="flex items-center bg-gray-700 text-white px-3 py-2 rounded-lg text-sm max-w-sm">
+                {" "}
+                {/* Adjusted styling to match image */}
+                {filePreview && attachedFile.type.startsWith("image/") ? (
+                  <img
+                    src={filePreview}
+                    alt="Preview"
+                    className="w-8 h-8 object-cover rounded-md mr-2" // Smaller image preview for consistency
+                  />
+                ) : (
+                  <div className="mr-2">
+                    {getFileDisplay(attachedFile.type)}
+                  </div>
+                )}
+                <div className="flex-1 flex flex-col overflow-hidden">
+                  <span className="text-sm font-medium truncate">
+                    {attachedFile.name}
+                  </span>
+                  {attachedFile.type === "application/pdf" && (
+                    <span className="text-xs text-gray-300">PDF</span>
+                  )}
+                  {attachedFile.type.startsWith("image/") && (
+                    <span className="text-xs text-gray-300">Image</span>
+                  )}
+                  {attachedFile.type.startsWith("text/") && (
+                    <span className="text-xs text-gray-300">Text Document</span>
+                  )}
+                  {!(
+                    attachedFile.type.startsWith("image/") ||
+                    attachedFile.type.startsWith("text/") ||
+                    attachedFile.type === "application/pdf"
+                  ) && <span className="text-xs text-gray-300">File</span>}
+                </div>
+                <button
+                  onClick={removeAttachedFile}
+                  className="ml-auto text-gray-400 hover:text-gray-200 p-1 rounded-full" // Adjusted remove button styling
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="text"
+                placeholder="Type your message..."
+                className="flex-1 rounded-full px-4 py-2 bg-gray-800 text-white placeholder-gray-400 outline-none"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyPress}
+                disabled={loading}
+              />
+
+              {/* Hidden File Input */}
+              <input
+                type="file"
+                id="fileInput"
+                className="hidden"
+                onChange={handleFileChange}
+                accept=".pdf,.doc,.docx,.txt,image/*"
+                disabled={loading}
+              />
+              <label htmlFor="fileInput">
+                <Paperclip
+                  className={`text-pink-400 ${
+                    loading
+                      ? "opacity-50 cursor-not-allowed"
+                      : "hover:text-pink-600 cursor-pointer"
+                  }`}
+                />
+              </label>
+
+              <Mic
+                className={`text-pink-400 ${
+                  loading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+                }`}
+              />
+              <Send
+                onClick={handleSendButtonClick}
+                className={`text-pink-400 ${
+                  loading
+                    ? "opacity-50 cursor-not-allowed"
+                    : "cursor-pointer hover:text-pink-600"
+                }`}
+                disabled={loading}
+              />
+            </div>
           </div>
         </div>
       </div>
-      {/* Add a style block for the dot animation and scrollbar hiding */}
-      <style jsx>{`
-        @keyframes blink {
-          0%,
-          100% {
-            opacity: 0.2;
-          }
-          33% {
-            opacity: 1;
-          }
-          66% {
-            opacity: 0.2;
-          }
-        }
-        .dot-animation {
-          animation: blink 1.4s infinite;
-        }
-        .dot-animation.animation-delay-1 {
-          animation-delay: 0.2s;
-        }
-        .dot-animation.animation-delay-2 {
-          animation-delay: 0.4s;
-        }
-
-        /* Hide scrollbar for Chrome, Safari and Opera */
-        .custom-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-
-        /* Hide scrollbar for IE, Edge and Firefox */
-        .custom-scrollbar {
-          -ms-overflow-style: none; /* IE and Edge */
-          scrollbar-width: none; /* Firefox */
-        }
-      `}</style>
     </div>
   );
 };
-
 
 export default ChatUI;
